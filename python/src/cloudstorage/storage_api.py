@@ -25,6 +25,7 @@ __all__ = ['ReadBuffer',
 import collections
 import os
 import urlparse
+import re
 
 from . import api_utils
 from . import common
@@ -38,6 +39,25 @@ except ImportError:
   from google.appengine.api import urlfetch
   from google.appengine.ext import ndb
 
+
+def _convert_newlines(content):
+  """ Repace \r (but not \r\n) with \n """
+
+  if content:
+    if content.endswith('\r') and '\r\n' in content:
+      # Buffer boundary might end in-between a \r\n, so try to detect if other
+      # \r\n's exist in the content.  Don't do replacement if found.
+      #
+      # Note: There is a edge-case bug here if the file uses \r\n but there's
+      # no \r\n to detect within the buffer size (typically 1MB), AND the
+      # buffer happens to end exactly between a \r\n (so a single line of text
+      # 1MB long that ends between a \r\n with no intermediate \r\n)
+      # This results in \n\n being emitted rather than \r\n (extra newline).
+      pass
+    else:
+      content = re.sub(r'\r\n|(\r)', lambda m: m.group(1) and '\n' or m.group(0), content)
+
+  return content
 
 
 def _get_storage_api(retry_params, account_id=None):
@@ -591,6 +611,9 @@ class _Buffer(object):
     self.reset()
 
   def reset(self, content='', offset=0):
+
+    content = _convert_newlines(content)
+
     self._buffer = content
     self._offset = offset
 
